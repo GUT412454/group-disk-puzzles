@@ -9,17 +9,6 @@ def yuv_to_rgb(y: float, u: float, v: float) -> Tuple[int, int, int]:
     b = int(y + 1.2 * (u - 128))
     return max(0, min(r, 255)), max(0, min(g, 255)), max(0, min(b, 255))
 
-# 生成渐变背景图像
-def generate_gradient_background(width: int, height: int) -> pygame.Surface:
-    background = pygame.Surface((width, height))
-    for x in range(width):
-        for y in range(height):
-            u = 256 * (x / width)
-            v = 256 * (y / height)
-            gradient_color = yuv_to_rgb(128, u, v)
-            background.set_at((x, y), gradient_color)
-    return background
-
 class BlockView:
     def __init__(self, block_id: int, logical_position: Position, config: GameConfig, model=None):
         self.block_id = block_id
@@ -69,13 +58,23 @@ class BlockView:
         # 绘制块
         pygame.draw.circle(screen, self.color, (x, y), self.config.block_radius)
 
+def generate_background(width: int, height: int, blocks: Dict[int, BlockView], config: GameConfig) -> pygame.Surface:
+    """生成灰色背景 + 每个位置有比块稍大的彩色实心圆"""
+    background = pygame.Surface((width, height))
+    background.fill((60, 60, 60))
+    spot_radius = config.block_radius * 2
+    for block_view in blocks.values():
+        x, y = int(block_view.display_position.real), int(block_view.display_position.imag)
+        pygame.draw.circle(background, block_view.color, (x, y), spot_radius)
+    return background
+
 class CubeView:
     def __init__(self, config: GameConfig, model: GroupModel = None):
         self.config = config
         self.model = model
         self.blocks: Dict[int, BlockView] = {}
-        self.background = generate_gradient_background(config.width, config.height)
         self._initialize_blocks()
+        self.background = generate_background(config.width, config.height, self.blocks, config)
     
     def _initialize_blocks(self):
         """初始化所有块"""
@@ -94,7 +93,7 @@ class CubeView:
     def draw(self, screen: pygame.Surface, 
              animation_states: Dict[int, AnimationState] = None,
              current_state: CubeState = None):
-        """绘制整个魔方（内置画法：背景 + 块，无圆环）"""
+        """绘制整个魔方：背景图 + 块"""
         screen.blit(self.background, (0, 0))
         for block_id, block_view in self.blocks.items():
             display_pos = None
@@ -120,47 +119,52 @@ class UIView:
         self.small_font = pygame.font.SysFont("SimHei", 18)
     
     def draw_controls(self, screen: pygame.Surface):
-        """绘制控制说明"""
+        """绘制控制说明（右侧面板）"""
+        x = 615
         model_name = self.model.get_model_name() if self.model else "M12 Puzzle"
         controls = [
-            f"当前模型: {model_name}",
-            "Q/S - 左(重心)转盘逆/顺   L/P - 右(重心)转盘逆/顺",
-            "方向键: 加入旋转队列  空格: 求解  R: 重置  M: 打乱",
-            "1: M12内置  [ / ]: 上下模型  2-9: 选择Sage模型"
+            f"模型: {model_name}",
+            "Q:左逆  S:左顺",
+            "L:右逆  P:右顺",
+            "方向键: 加入队列",
+            "空格:求解  R:重置  M:打乱",
+            "[:上模型  ]:下模型",
+            "1:M12内置  2-9:Sage"
         ]
         
         for i, text in enumerate(controls):
-            text_surface = self.font.render(text, True, (255, 255, 255))
-            screen.blit(text_surface, (10, 10 + i * 25))
+            text_surface = self.small_font.render(text, True, (255, 255, 255))
+            screen.blit(text_surface, (x, 15 + i * 23))
     
     def draw_model_info(self, screen: pygame.Surface, available_models: List[str], current_model: str):
-        """绘制模型信息"""
-        y_pos = 400
-        text = f"可用模型: {', '.join(available_models)}"
+        """绘制模型信息（右侧面板）"""
+        x, y = 615, 400
+        text = f"可用模型: {len(available_models)}个"
         text_surface = self.small_font.render(text, True, (200, 200, 200))
-        screen.blit(text_surface, (10, y_pos))
+        screen.blit(text_surface, (x, y))
         
-        text = f"当前模型: {current_model}"
+        text = f"当前: {current_model}"
         text_surface = self.small_font.render(text, True, (255, 255, 255))
-        screen.blit(text_surface, (10, y_pos + 20))
+        screen.blit(text_surface, (x, y + 22))
     
     def draw_solution(self, screen: pygame.Surface, solution: List[Move], current_step: int):
-        """绘制解法信息"""
+        """绘制解法信息（右侧面板）"""
         if not solution:
             return
         
-        text = f"解法: {current_step + 1}/{len(solution)} - {solution[current_step]}"
-        text_surface = self.font.render(text, True, (255, 255, 255))
-        screen.blit(text_surface, (10, 500))
+        text_surface = self.font.render(f"解法: {current_step + 1}/{len(solution)}", True, (255, 255, 255))
+        screen.blit(text_surface, (615, 500))
+        text_surface = self.small_font.render(str(solution[current_step]), True, (255, 255, 255))
+        screen.blit(text_surface, (615, 528))
     
     def draw_solving(self, screen: pygame.Surface):
-        """显示求解中状态"""
+        """显示求解中状态（右侧面板）"""
         text = "求解中..."
         text_surface = self.font.render(text, True, (255, 255, 255))
-        screen.blit(text_surface, (10, 530))
+        screen.blit(text_surface, (615, 530))
     
     def draw_scrambling(self, screen: pygame.Surface):
-        """显示打乱中状态"""
+        """显示打乱中状态（右侧面板）"""
         text = "打乱中..."
         text_surface = self.font.render(text, True, (255, 255, 255))
-        screen.blit(text_surface, (10, 530))
+        screen.blit(text_surface, (615, 530))

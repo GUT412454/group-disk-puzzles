@@ -43,7 +43,7 @@ def main():
     config = GameConfig(
         animation_frames=120,
         frame_rate=120,
-        width=600,
+        width=900,
         height=600,
         block_radius=20,
         block_border=2
