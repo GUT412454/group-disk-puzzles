@@ -46,7 +46,8 @@ def main():
         width=900,
         height=600,
         block_radius=20,
-        block_border=2
+        block_border=2,
+        puzzle_area_width=600
     )
 
     # 创建窗口

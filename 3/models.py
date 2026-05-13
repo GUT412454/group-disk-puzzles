@@ -29,6 +29,7 @@ class GameConfig:
     height: int = 600
     block_radius: int = 20
     block_border: int = 2
+    puzzle_area_width: int = 600
 
 # 位置和操作定义
 @dataclass(frozen=True)
